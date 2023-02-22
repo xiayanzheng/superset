@@ -16,16 +16,15 @@
  * specific language governing permissions and limitations
  * under the License.
  */
+import { FeatureFlag, isFeatureEnabled } from '@superset-ui/core';
 import React, { lazy } from 'react';
 
 // not lazy loaded since this is the home page.
 import Welcome from 'src/views/CRUD/welcome/Welcome';
 
-const AddSliceContainer = lazy(
+const ChartCreation = lazy(
   () =>
-    import(
-      /* webpackChunkName: "AddSliceContainer" */ 'src/addSlice/AddSliceContainer'
-    ),
+    import(/* webpackChunkName: "ChartCreation" */ 'src/pages/ChartCreation'),
 );
 const AnnotationLayersList = lazy(
   () =>
@@ -46,10 +45,7 @@ const AnnotationList = lazy(
     ),
 );
 const ChartList = lazy(
-  () =>
-    import(
-      /* webpackChunkName: "ChartList" */ 'src/views/CRUD/chart/ChartList'
-    ),
+  () => import(/* webpackChunkName: "ChartList" */ 'src/pages/ChartList'),
 );
 const CssTemplatesList = lazy(
   () =>
@@ -110,6 +106,15 @@ const SavedQueryList = lazy(
       /* webpackChunkName: "SavedQueryList" */ 'src/views/CRUD/data/savedquery/SavedQueryList'
     ),
 );
+const AllEntitiesPage = lazy(
+  () =>
+    import(
+      /* webpackChunkName: "AllEntities" */ 'src/views/CRUD/allentities/AllEntities'
+    ),
+);
+const TagsPage = lazy(
+  () => import(/* webpackChunkName: "TagList" */ 'src/views/CRUD/tags/TagList'),
+);
 
 type Routes = {
   path: string;
@@ -133,7 +138,7 @@ export const routes: Routes = [
   },
   {
     path: '/chart/add',
-    Component: AddSliceContainer,
+    Component: ChartCreation,
   },
   {
     path: '/chart/list/',
@@ -156,11 +161,11 @@ export const routes: Routes = [
     Component: CssTemplatesList,
   },
   {
-    path: '/annotationlayermodelview/list/',
+    path: '/annotationlayer/list/',
     Component: AnnotationLayersList,
   },
   {
-    path: '/annotationmodelview/:annotationLayerId/annotation/',
+    path: '/annotationlayer/:annotationLayerId/annotation/',
     Component: AnnotationList,
   },
   {
@@ -206,6 +211,17 @@ export const routes: Routes = [
     Component: AddDataset,
   },
 ];
+
+if (isFeatureEnabled(FeatureFlag.TAGGING_SYSTEM)) {
+  routes.push({
+    path: '/superset/all_entities/',
+    Component: AllEntitiesPage,
+  });
+  routes.push({
+    path: '/superset/tags/',
+    Component: TagsPage,
+  });
+}
 
 const frontEndRoutes = routes
   .map(r => r.path)

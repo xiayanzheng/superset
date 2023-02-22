@@ -28,6 +28,7 @@ import {
 } from 'src/views/CRUD/utils';
 import { useListViewResource, useFavoriteStatus } from 'src/views/CRUD/hooks';
 import ConfirmStatusChange from 'src/components/ConfirmStatusChange';
+import { TagsList } from 'src/components/Tags';
 import handleResourceExport from 'src/utils/export';
 import Loading from 'src/components/Loading';
 import SubMenu, { SubMenuProps } from 'src/views/components/SubMenu';
@@ -39,17 +40,21 @@ import ListView, {
 } from 'src/components/ListView';
 import { dangerouslyGetItemDoNotUse } from 'src/utils/localStorageHelpers';
 import Owner from 'src/types/Owner';
+import Tag from 'src/types/TagType';
 import withToasts from 'src/components/MessageToasts/withToasts';
 import FacePile from 'src/components/FacePile';
 import Icons from 'src/components/Icons';
+import DeleteModal from 'src/components/DeleteModal';
 import FaveStar from 'src/components/FaveStar';
 import PropertiesModal from 'src/dashboard/components/PropertiesModal';
 import { Tooltip } from 'src/components/Tooltip';
 import ImportModelsModal from 'src/components/ImportModal/index';
 
 import Dashboard from 'src/dashboard/containers/Dashboard';
+import { Dashboard as CRUDDashboard } from 'src/views/CRUD/types';
 import CertifiedBadge from 'src/components/CertifiedBadge';
-import { bootstrapData } from 'src/preamble';
+import { loadTags } from 'src/components/Tags/utils';
+import getBootstrapData from 'src/utils/getBootstrapData';
 import DashboardCard from './DashboardCard';
 import { DashboardStatus } from './types';
 
@@ -88,12 +93,15 @@ interface Dashboard {
   url: string;
   thumbnail_url: string;
   owners: Owner[];
+  tags: Tag[];
   created_by: object;
 }
 
 const Actions = styled.div`
   color: ${({ theme }) => theme.colors.grayscale.base};
 `;
+
+const bootstrapData = getBootstrapData();
 
 function DashboardList(props: DashboardListProps) {
   const {
@@ -129,6 +137,8 @@ function DashboardList(props: DashboardListProps) {
   const [dashboardToEdit, setDashboardToEdit] = useState<Dashboard | null>(
     null,
   );
+  const [dashboardToDelete, setDashboardToDelete] =
+    useState<CRUDDashboard | null>(null);
 
   const [importingDashboard, showImportModal] = useState<boolean>(false);
   const [passwordFields, setPasswordFields] = useState<string[]>([]);
@@ -184,6 +194,8 @@ function DashboardList(props: DashboardListProps) {
                 url = '',
                 certified_by = '',
                 certification_details = '',
+                owners,
+                tags,
               } = json.result;
               return {
                 ...dashboard,
@@ -197,6 +209,8 @@ function DashboardList(props: DashboardListProps) {
                 url,
                 certified_by,
                 certification_details,
+                owners,
+                tags,
               };
             }
             return dashboard;
@@ -348,6 +362,31 @@ function DashboardList(props: DashboardListProps) {
         size: 'xl',
       },
       {
+        Cell: ({
+          row: {
+            original: { tags = [] },
+          },
+        }: {
+          row: {
+            original: {
+              tags: Tag[];
+            };
+          };
+        }) => (
+          // Only show custom type tags
+          <TagsList
+            tags={tags.filter(
+              (tag: Tag) => tag.type === 'TagTypes.custom' || tag.type === 1,
+            )}
+            maxTags={3}
+          />
+        ),
+        Header: t('Tags'),
+        accessor: 'tags',
+        disableSortBy: true,
+        hidden: !isFeatureEnabled(FeatureFlag.TAGGING_SYSTEM),
+      },
+      {
         Cell: ({ row: { original } }: any) => {
           const handleDelete = () =>
             handleDashboardDelete(
@@ -447,6 +486,7 @@ function DashboardList(props: DashboardListProps) {
   const favoritesFilter: Filter = useMemo(
     () => ({
       Header: t('Favorite'),
+      key: 'favorite',
       id: 'id',
       urlDisplay: 'favorite',
       input: 'select',
@@ -460,10 +500,18 @@ function DashboardList(props: DashboardListProps) {
     [],
   );
 
-  const filters: Filters = useMemo(
-    () => [
+  const filters: Filters = useMemo(() => {
+    const filters_list = [
+      {
+        Header: t('Search'),
+        key: 'search',
+        id: 'dashboard_title',
+        input: 'search',
+        operator: FilterOperator.titleOrSlug,
+      },
       {
         Header: t('Owner'),
+        key: 'owner',
         id: 'owners',
         input: 'select',
         operator: FilterOperator.relationManyMany,
@@ -485,6 +533,7 @@ function DashboardList(props: DashboardListProps) {
       },
       {
         Header: t('Created by'),
+        key: 'created_by',
         id: 'created_by',
         input: 'select',
         operator: FilterOperator.relationOneMany,
@@ -506,6 +555,7 @@ function DashboardList(props: DashboardListProps) {
       },
       {
         Header: t('Status'),
+        key: 'published',
         id: 'published',
         input: 'select',
         operator: FilterOperator.equals,
@@ -518,6 +568,7 @@ function DashboardList(props: DashboardListProps) {
       ...(userId ? [favoritesFilter] : []),
       {
         Header: t('Certified'),
+        key: 'certified',
         id: 'id',
         urlDisplay: 'certified',
         input: 'select',
@@ -528,15 +579,20 @@ function DashboardList(props: DashboardListProps) {
           { label: t('No'), value: false },
         ],
       },
-      {
-        Header: t('Search'),
-        id: 'dashboard_title',
-        input: 'search',
-        operator: FilterOperator.titleOrSlug,
-      },
-    ],
-    [addDangerToast, favoritesFilter, props.user],
-  );
+    ] as Filters;
+    if (isFeatureEnabled(FeatureFlag.TAGGING_SYSTEM)) {
+      filters_list.push({
+        Header: t('Tags'),
+        key: 'tags',
+        id: 'tags',
+        input: 'select',
+        operator: FilterOperator.chartTags,
+        unfilteredLabel: t('All'),
+        fetchSelects: loadTags,
+      });
+    }
+    return filters_list;
+  }, [addDangerToast, favoritesFilter, props.user]);
 
   const sortTypes = [
     {
@@ -565,7 +621,6 @@ function DashboardList(props: DashboardListProps) {
         dashboard={dashboard}
         hasPerm={hasPerm}
         bulkSelectEnabled={bulkSelectEnabled}
-        refreshData={refreshData}
         showThumbnails={
           userKey
             ? userKey.thumbnails
@@ -573,23 +628,19 @@ function DashboardList(props: DashboardListProps) {
         }
         userId={userId}
         loading={loading}
-        addDangerToast={addDangerToast}
-        addSuccessToast={addSuccessToast}
         openDashboardEditModal={openDashboardEditModal}
         saveFavoriteStatus={saveFavoriteStatus}
         favoriteStatus={favoriteStatus[dashboard.id]}
         handleBulkDashboardExport={handleBulkDashboardExport}
+        onDelete={dashboard => setDashboardToDelete(dashboard)}
       />
     ),
     [
-      addDangerToast,
-      addSuccessToast,
       bulkSelectEnabled,
       favoriteStatus,
       hasPerm,
       loading,
       userId,
-      refreshData,
       saveFavoriteStatus,
       userKey,
     ],
@@ -669,6 +720,30 @@ function DashboardList(props: DashboardListProps) {
                   show
                   onHide={() => setDashboardToEdit(null)}
                   onSubmit={handleDashboardEdit}
+                />
+              )}
+              {dashboardToDelete && (
+                <DeleteModal
+                  description={
+                    <>
+                      {t('Are you sure you want to delete')}{' '}
+                      <b>{dashboardToDelete.dashboard_title}</b>?
+                    </>
+                  }
+                  onConfirm={() => {
+                    handleDashboardDelete(
+                      dashboardToDelete,
+                      refreshData,
+                      addSuccessToast,
+                      addDangerToast,
+                      undefined,
+                      userId,
+                    );
+                    setDashboardToDelete(null);
+                  }}
+                  onHide={() => setDashboardToDelete(null)}
+                  open={!!dashboardToDelete}
+                  title={t('Please confirm')}
                 />
               )}
               <ListView<Dashboard>

@@ -16,6 +16,8 @@
  * specific language governing permissions and limitations
  * under the License.
  */
+import { DatabaseObject } from 'src/components/DatabaseSelector';
+
 export enum DatasetActionType {
   selectDatabase,
   selectSchema,
@@ -24,12 +26,11 @@ export enum DatasetActionType {
 }
 
 export interface DatasetObject {
-  id: number;
-  database_name?: string;
-  owners?: number[];
+  db: DatabaseObject & { owners: [number] };
   schema?: string | null;
   dataset_name: string;
   table_name?: string | null;
+  explore_url?: string;
 }
 
 export interface DatasetReducerPayloadType {
@@ -43,10 +44,13 @@ export type Schema = {
 
 export type DSReducerActionType =
   | {
-      type: DatasetActionType.selectDatabase | DatasetActionType.selectTable;
+      type: DatasetActionType.selectDatabase;
       payload: Partial<DatasetObject>;
     }
   | {
-      type: DatasetActionType.changeDataset | DatasetActionType.selectSchema;
+      type:
+        | DatasetActionType.changeDataset
+        | DatasetActionType.selectSchema
+        | DatasetActionType.selectTable;
       payload: DatasetReducerPayloadType;
     };

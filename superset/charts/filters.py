@@ -24,8 +24,9 @@ from superset import db, security_manager
 from superset.connectors.sqla import models
 from superset.connectors.sqla.models import SqlaTable
 from superset.models.slice import Slice
+from superset.utils.core import get_user_id
 from superset.views.base import BaseFilter
-from superset.views.base_api import BaseFavoriteFilter
+from superset.views.base_api import BaseFavoriteFilter, BaseTagFilter
 
 
 class ChartAllTextFilter(BaseFilter):  # pylint: disable=too-few-public-methods
@@ -52,6 +53,16 @@ class ChartFavoriteFilter(BaseFavoriteFilter):  # pylint: disable=too-few-public
     """
 
     arg_name = "chart_is_favorite"
+    class_name = "slice"
+    model = Slice
+
+
+class ChartTagFilter(BaseTagFilter):  # pylint: disable=too-few-public-methods
+    """
+    Custom filter for the GET list that filters all dashboards that a user has favored
+    """
+
+    arg_name = "chart_tags"
     class_name = "slice"
     model = Slice
 
@@ -109,3 +120,18 @@ class ChartHasCreatedByFilter(BaseFilter):  # pylint: disable=too-few-public-met
         if value is False:
             return query.filter(and_(Slice.created_by_fk.is_(None)))
         return query
+
+
+class ChartCreatedByMeFilter(BaseFilter):  # pylint: disable=too-few-public-methods
+    name = _("Created by me")
+    arg_name = "chart_created_by_me"
+
+    def apply(self, query: Query, value: Any) -> Query:
+        return query.filter(
+            or_(
+                Slice.created_by_fk  # pylint: disable=comparison-with-callable
+                == get_user_id(),
+                Slice.changed_by_fk  # pylint: disable=comparison-with-callable
+                == get_user_id(),
+            )
+        )

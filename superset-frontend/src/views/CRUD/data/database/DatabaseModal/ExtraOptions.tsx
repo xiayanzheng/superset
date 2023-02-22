@@ -29,7 +29,7 @@ import {
   antdCollapseStyles,
   no_margin_bottom,
 } from './styles';
-import { DatabaseObject } from '../types';
+import { DatabaseObject, ExtraJson } from '../types';
 
 const ExtraOptions = ({
   db,
@@ -48,6 +48,18 @@ const ExtraOptions = ({
 }) => {
   const expandableModalIsOpen = !!db?.expose_in_sqllab;
   const createAsOpen = !!(db?.allow_ctas || db?.allow_cvas);
+  const isFileUploadSupportedByEngine =
+    db?.engine_information?.supports_file_upload;
+
+  // JSON.parse will deep parse engine_params
+  // if it's an object, and we want to keep it a string
+  const extraJson: ExtraJson = JSON.parse(db?.extra || '{}', (key, value) => {
+    if (key === 'engine_params' && typeof value === 'object') {
+      // keep this as a string
+      return JSON.stringify(value);
+    }
+    return value;
+  });
 
   return (
     <Collapse
@@ -58,9 +70,9 @@ const ExtraOptions = ({
       <Collapse.Panel
         header={
           <div>
-            <h4>SQL Lab</h4>
+            <h4>{t('SQL Lab')}</h4>
             <p className="helper">
-              Adjust how this database will interact with SQL Lab.
+              {t('Adjust how this database will interact with SQL Lab.')}
             </p>
           </div>
         }
@@ -120,9 +132,9 @@ const ExtraOptions = ({
                   <input
                     type="text"
                     name="force_ctas_schema"
-                    value={db?.force_ctas_schema || ''}
                     placeholder={t('Create or select schema...')}
                     onChange={onInputChange}
+                    value={db?.force_ctas_schema || ''}
                   />
                 </div>
                 <div className="helper">
@@ -153,13 +165,13 @@ const ExtraOptions = ({
                 <IndeterminateCheckbox
                   id="cost_estimate_enabled"
                   indeterminate={false}
-                  checked={!!db?.extra_json?.cost_estimate_enabled}
+                  checked={!!extraJson?.cost_estimate_enabled}
                   onChange={onExtraInputChange}
                   labelText={t('Enable query cost estimation')}
                 />
                 <InfoTooltip
                   tooltip={t(
-                    'For Presto and Postgres, shows a button to compute cost before running a query.',
+                    'For Bigquery, Presto and Postgres, shows a button to compute cost before running a query.',
                   )}
                 />
               </div>
@@ -169,7 +181,7 @@ const ExtraOptions = ({
                 <IndeterminateCheckbox
                   id="allows_virtual_table_explore"
                   indeterminate={false}
-                  checked={!!db?.extra_json?.allows_virtual_table_explore}
+                  checked={!!extraJson?.allows_virtual_table_explore}
                   onChange={onExtraInputChange}
                   labelText={t('Allow this database to be explored')}
                 />
@@ -185,7 +197,7 @@ const ExtraOptions = ({
                 <IndeterminateCheckbox
                   id="disable_data_preview"
                   indeterminate={false}
-                  checked={!!db?.extra_json?.disable_data_preview}
+                  checked={!!extraJson?.disable_data_preview}
                   onChange={onExtraInputChange}
                   labelText={t('Disable SQL Lab data preview queries')}
                 />
@@ -204,9 +216,9 @@ const ExtraOptions = ({
       <Collapse.Panel
         header={
           <div>
-            <h4>Performance</h4>
+            <h4>{t('Performance')}</h4>
             <p className="helper">
-              Adjust performance settings of this database.
+              {t('Adjust performance settings of this database.')}
             </p>
           </div>
         }
@@ -238,8 +250,7 @@ const ExtraOptions = ({
               type="number"
               name="schema_cache_timeout"
               value={
-                db?.extra_json?.metadata_cache_timeout?.schema_cache_timeout ||
-                ''
+                extraJson?.metadata_cache_timeout?.schema_cache_timeout || ''
               }
               placeholder={t('Enter duration in seconds')}
               onChange={onExtraInputChange}
@@ -260,8 +271,7 @@ const ExtraOptions = ({
               type="number"
               name="table_cache_timeout"
               value={
-                db?.extra_json?.metadata_cache_timeout?.table_cache_timeout ||
-                ''
+                extraJson?.metadata_cache_timeout?.table_cache_timeout || ''
               }
               placeholder={t('Enter duration in seconds')}
               onChange={onExtraInputChange}
@@ -299,7 +309,7 @@ const ExtraOptions = ({
             <IndeterminateCheckbox
               id="cancel_query_on_windows_unload"
               indeterminate={false}
-              checked={!!db?.extra_json?.cancel_query_on_windows_unload}
+              checked={!!extraJson?.cancel_query_on_windows_unload}
               onChange={onExtraInputChange}
               labelText={t('Cancel query on window unload event')}
             />
@@ -316,8 +326,8 @@ const ExtraOptions = ({
       <Collapse.Panel
         header={
           <div>
-            <h4>Security</h4>
-            <p className="helper">Add extra connection information.</p>
+            <h4>{t('Security')}</h4>
+            <p className="helper">{t('Add extra connection information.')}</p>
           </div>
         }
         key="3"
@@ -364,28 +374,9 @@ const ExtraOptions = ({
             )}
           </div>
         </StyledInputContainer>
-        <StyledInputContainer>
-          <div className="control-label">
-            {t('Schemas allowed for CSV upload')}
-          </div>
-          <div className="input-container">
-            <input
-              type="text"
-              name="schemas_allowed_for_file_upload"
-              value={(
-                db?.extra_json?.schemas_allowed_for_file_upload || []
-              ).join(',')}
-              placeholder="schema1,schema2"
-              onChange={onExtraInputChange}
-            />
-          </div>
-          <div className="helper">
-            {t(
-              'A comma-separated list of schemas that CSVs are allowed to upload to.',
-            )}
-          </div>
-        </StyledInputContainer>
-        <StyledInputContainer css={{ no_margin_bottom }}>
+        <StyledInputContainer
+          css={!isFileUploadSupportedByEngine ? no_margin_bottom : {}}
+        >
           <div className="input-container">
             <IndeterminateCheckbox
               id="impersonate_user"
@@ -407,28 +398,50 @@ const ExtraOptions = ({
             />
           </div>
         </StyledInputContainer>
-        <StyledInputContainer css={{ ...no_margin_bottom }}>
-          <div className="input-container">
-            <IndeterminateCheckbox
-              id="allow_file_upload"
-              indeterminate={false}
-              checked={!!db?.allow_file_upload}
-              onChange={onInputChange}
-              labelText={t('Allow data upload')}
-            />
-            <InfoTooltip
-              tooltip={t(
-                'If selected, please set the schemas allowed for data upload in Extra.',
+        {isFileUploadSupportedByEngine && (
+          <StyledInputContainer
+            css={!db?.allow_file_upload ? no_margin_bottom : {}}
+          >
+            <div className="input-container">
+              <IndeterminateCheckbox
+                id="allow_file_upload"
+                indeterminate={false}
+                checked={!!db?.allow_file_upload}
+                onChange={onInputChange}
+                labelText={t('Allow file uploads to database')}
+              />
+            </div>
+          </StyledInputContainer>
+        )}
+        {isFileUploadSupportedByEngine && !!db?.allow_file_upload && (
+          <StyledInputContainer css={no_margin_bottom}>
+            <div className="control-label">
+              {t('Schemas allowed for File upload')}
+            </div>
+            <div className="input-container">
+              <input
+                type="text"
+                name="schemas_allowed_for_file_upload"
+                value={(extraJson?.schemas_allowed_for_file_upload || []).join(
+                  ',',
+                )}
+                placeholder="schema1,schema2"
+                onChange={onExtraInputChange}
+              />
+            </div>
+            <div className="helper">
+              {t(
+                'A comma-separated list of schemas that files are allowed to upload to.',
               )}
-            />
-          </div>
-        </StyledInputContainer>
+            </div>
+          </StyledInputContainer>
+        )}
       </Collapse.Panel>
       <Collapse.Panel
         header={
           <div>
-            <h4>Other</h4>
-            <p className="helper">Additional settings.</p>
+            <h4>{t('Other')}</h4>
+            <p className="helper">{t('Additional settings.')}</p>
           </div>
         }
         key="4"
@@ -438,13 +451,17 @@ const ExtraOptions = ({
           <div className="input-container">
             <StyledJsonEditor
               name="metadata_params"
-              value={db?.extra_json?.metadata_params || ''}
               placeholder={t('Metadata Parameters')}
               onChange={(json: string) =>
                 onExtraEditorChange({ json, name: 'metadata_params' })
               }
               width="100%"
               height="160px"
+              defaultValue={
+                !Object.keys(extraJson?.metadata_params || {}).length
+                  ? ''
+                  : extraJson?.metadata_params
+              }
             />
           </div>
           <div className="helper">
@@ -460,13 +477,17 @@ const ExtraOptions = ({
           <div className="input-container">
             <StyledJsonEditor
               name="engine_params"
-              value={db?.extra_json?.engine_params || ''}
               placeholder={t('Engine Parameters')}
               onChange={(json: string) =>
                 onExtraEditorChange({ json, name: 'engine_params' })
               }
               width="100%"
               height="160px"
+              defaultValue={
+                !Object.keys(extraJson?.engine_params || {}).length
+                  ? ''
+                  : extraJson?.engine_params
+              }
             />
           </div>
           <div className="helper">
@@ -485,9 +506,9 @@ const ExtraOptions = ({
             <input
               type="number"
               name="version"
-              value={db?.extra_json?.version || ''}
               placeholder={t('Version number')}
               onChange={onExtraInputChange}
+              value={extraJson?.version || ''}
             />
           </div>
           <div className="helper">
